@@ -1,42 +1,49 @@
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
-import { createAssistant } from "vapi"; // Byt mot riktig import från VAPI
+import { VAPI } from "@vapi-ai/server-sdk"; // Server-SDK
 
 const app = express();
-app.use(bodyParser.json());
-app.use(cors({ origin: "*" })); // Tillåt alla domäner, kan begränsas senare
+const PORT = process.env.PORT || 3000;
 
+app.use(cors());
+app.use(bodyParser.json());
+
+// ===== Test-route =====
+app.get("/", (req, res) => {
+  res.send("Server is running");
+});
+
+// ===== Route för AI-receptionist demo =====
 app.post("/create-demo", async (req, res) => {
   try {
-    const { receptionist_name, voice, business_type, business_type_other, opening_hours, additional_info, email } = req.body;
-
-    if (!receptionist_name || !voice || !business_type || !email) {
-      return res.status(400).json({ error: "Obligatoriska fält saknas." });
+    const vapiKey = process.env.VAPI_API_KEY;
+    if (!vapiKey) {
+      return res.status(500).json({ error: "VAPI_API_KEY is not set" });
     }
 
-    const businessName = business_type === "Annan" && business_type_other
-      ? business_type_other
-      : business_type;
+    const demoData = req.body; // här kommer frontend-data
 
-    const greeting = `Hej och välkommen till ${businessName}. Jag heter ${receptionist_name} och är vår AI-receptionist. Hur kan jag hjälpa dig idag?`;
+    // Initiera VAPI med din private API-nyckel
+    const vapiClient = new VAPI({ apiKey: vapiKey });
 
-    const assistant = await createAssistant({
-      name: receptionist_name,
-      voice,
-      greeting,
-      business_type: businessName,
-      opening_hours,
-      additional_info,
-      demo_duration: 60
+    // Skapa temporär AI-receptionist (1-minuts demo)
+    const demo = await vapiClient.createAssistant({
+      ...demoData,
+      demo_duration: 60 // 1 minut
     });
 
-    res.json({ demo_url: assistant.demo_url, demo_id: assistant.id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Kunde inte skapa AI-receptionist." });
+    return res.json({
+      message: "Temporär AI-receptionist skapad!",
+      demo
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Något gick fel på servern" });
   }
 });
 
-export default app;
-X
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
